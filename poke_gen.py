@@ -102,3 +102,22 @@ il doit influencer légèrement les créations.
     df = pd.DataFrame(pd.read_json(data)["pokemon"])
 
     return df
+
+# ------------------------------------------------------
+# Bloc Streamlit : Génération et affichage
+# ------------------------------------------------------
+st.subheader("🧬 Génération des Pokémon")
+
+if "pokemons" not in st.session_state:
+    st.session_state["pokemons"] = None
+
+if api_key:
+    if st.button("Générer des Pokémon"):
+        with st.spinner("Création des Pokémon en cours..."):
+            df_poke = generer_pokemon(api_key, nb_pokemon, type_dominant)
+            st.session_state["pokemons"] = df_poke
+        st.success("Pokémon générés avec succès !")
+
+# On affiche les Pokémon de façon persistante
+if st.session_state["pokemons"] is not None:
+    st.dataframe(st.session_state["pokemons"])
