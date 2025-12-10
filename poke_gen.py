@@ -121,3 +121,14 @@ if api_key:
 # On affiche les Pokémon de façon persistante
 if st.session_state["pokemons"] is not None:
     st.dataframe(st.session_state["pokemons"])
+
+# ------------------------------------------------------
+# Zone de texte pour la personnalité du dresseur
+# ------------------------------------------------------
+st.subheader("🔮 Oracle de Recommandation")
+
+description_user = st.text_area(
+    "Décris ta personnalité",
+    placeholder="Ex : J'aime les combats stratégiques et les créatures loyales."
+)
+
