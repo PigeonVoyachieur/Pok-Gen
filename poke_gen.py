@@ -132,3 +132,50 @@ description_user = st.text_area(
     placeholder="Ex : J'aime les combats stratégiques et les créatures loyales."
 )
 
+# ------------------------------------------------------
+# Fonction pour trouver le Pokémon le plus compatible
+# ------------------------------------------------------
+def trouver_compagnon(api_key, dataframe, description_user):
+    client = Groq(api_key=api_key)
+
+    # on converti le DataFrame en texte
+    liste_texte = dataframe.to_json(orient="records", force_ascii=False)
+
+    system_prompt = """
+Tu es un moteur de recommandation Pokémon.
+Tu DOIS répondre en JSON strict, sans texte supplémentaire.
+Ton but : choisir le Pokémon dont la personnalité ou la description
+correspond le mieux à l'utilisateur.
+La réponse doit obligatoirement suivre ce format :
+
+{
+    "choix": "NomDuPokemon"
+}
+"""
+
+    user_prompt = f"""
+Voici la liste des Pokémon disponibles (en JSON) :
+{liste_texte}
+
+Voici la personnalité du dresseur :
+"{description_user}"
+
+Choisis le Pokémon le plus compatible et renvoie uniquement son nom dans le JSON demandé.
+"""
+
+    # On appel l'API
+    completion = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ],
+        response_format={"type": "json_object"}
+    )
+
+    # On récupère le JSON
+    resultat = pd.read_json(completion.choices[0].message.content)
+    nom_choisi = resultat["choix"][0]
+
+    return nom_choisi
+
