@@ -1,4 +1,6 @@
 import streamlit as st
+import pandas as pd
+from groq import Groq
 
 logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Pok%C3%A9_Ball_icon.svg/2052px-Pok%C3%A9_Ball_icon.svg.png"
 
@@ -52,3 +54,51 @@ st.subheader("🔍 Paramètres sélectionnés")
 st.write(f"- **Clé API fournie :** {'✔️ Oui' if api_key else '❌ Non'}")
 st.write(f"- **Nombre de Pokémon :** {nb_pokemon}")
 st.write(f"- **Type dominant :** {type_dominant}")
+
+# ------------------------------------------------------
+# Générer une liste de Pokémon via Groq
+# ------------------------------------------------------
+def generer_pokemon(api_key, nb_pokemon, type_dominant):
+    client = Groq(api_key=api_key)
+
+    # On impose la réponse en JSON strict
+    system_prompt = f"""
+Tu es une API de génération de Pokémon.
+Tu DOIS répondre exclusivement en JSON, sans texte avant ou après.
+
+Tu dois générer une liste de {nb_pokemon} Pokémon originaux.
+Chaque Pokémon doit suivre EXACTEMENT cette structure :
+
+{{
+  "pokemon": [
+    {{
+      "Nom": "Nom du Pokémon",
+      "Type": "Type principal (ou lié au thème si fourni)",
+      "Description": "Description courte",
+      "Personnalite": "Personnalité utile pour du matching futur",
+      "Stats": "Résumé des statistiques (ex: 'Rapide mais fragile')"
+    }}
+  ]
+}}
+
+Si l'utilisateur fournit un type dominant ou un thème, comme "{type_dominant}",
+il doit influencer légèrement les créations.
+"""
+
+    # On appel l'API Groq
+    completion = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": "Génère maintenant les Pokémon."}
+        ],
+        response_format={"type": "json_object"},
+    )
+
+    # On récupère le JSON généré
+    data = completion.choices[0].message.content
+
+    #  On convertie le JSON en DataFrame
+    df = pd.DataFrame(pd.read_json(data)["pokemon"])
+
+    return df
