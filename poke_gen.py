@@ -209,3 +209,31 @@ if st.session_state["pokemons"] is not None and api_key:
                 else:
                     st.error("Erreur : Pokémon non trouvé dans la liste.")
 
+#------------------------------------------------------
+# Affichage de la carte d'identité en JSON
+#------------------------------------------------------
+st.subheader("📄 Carte d'identité du champion")
+
+# On vérifier qu'un compagnon a été choisi
+if 'pokemons' in st.session_state and api_key:
+    if 'nom_compagnon' in locals() or 'nom_compagnon' in st.session_state:
+        # Pour la sécurité, on récupère le nom depuis st.session_state si nécessaire
+        nom_compagnon = nom_compagnon if 'nom_compagnon' in locals() else st.session_state['nom_compagnon']
+
+        # On filtrer le DataFrame pour récupérer la ligne correspondant au Pokémon choisi
+        poke = st.session_state["pokemons"]
+        selection = poke[poke["Nom"] == nom_compagnon]
+
+        if not selection.empty:
+            # Convertir la ligne en JSON brut
+            data_json = selection.iloc[0].to_dict()
+            json_brut = json.dumps(data_json, ensure_ascii=False, indent=4)
+
+            st.markdown("**Copiez ce code JSON, il est la carte d'identité de votre champion :**")
+            st.code(json_brut, language="json")
+        else:
+            st.warning("Le Pokémon choisi n'a pas été trouvé.")
+    else:
+        st.info("Cliquez d'abord sur 'Trouver mon Pokémon compagnon' pour générer la carte d'identité.")
+else:
+    st.info("Aucun Pokémon généré pour le moment.")
