@@ -98,9 +98,22 @@ il doit influencer légèrement les créations.
 
     # On récupère le JSON généré
     data = completion.choices[0].message.content
-
-    #  On convertie le JSON en DataFrame
-    df = pd.DataFrame(pd.read_json(data)["pokemon"])
+    
+    # on parse le JSON
+    data_dict = json.loads(data)
+    
+    # on extrait la liste des Pokémon
+    if "pokemon" in data_dict:
+        pokemon_list = data_dict["pokemon"]
+    else:
+        # Si la structure est différente, on prend la première clé
+        pokemon_list = list(data_dict.values())[0]
+    
+    # on crée le DataFrame à partir de la liste
+    df = pd.DataFrame(pokemon_list)
+    
+    # on normalise les colonnes dès la création
+    df.columns = [str(c).strip().lower() for c in df.columns]
 
     return df
 
@@ -117,7 +130,6 @@ if api_key:
         with st.spinner("Création des Pokémon en cours..."):
             df_poke = generer_pokemon(api_key, nb_pokemon, type_dominant)
             st.session_state["pokemons"] = df_poke
-        st.success("Pokémon générés avec succès !")
 
 # On affiche les Pokémon de façon persistante
 if st.session_state["pokemons"] is not None:
@@ -139,7 +151,7 @@ description_user = st.text_area(
 def trouver_compagnon(api_key, dataframe, description_user):
     client = Groq(api_key=api_key)
 
-    # Convertir le DataFrame en texte
+    # on converti le DataFrame en texte
     liste_texte = dataframe.to_json(orient="records", force_ascii=False)
 
     system_prompt = """
@@ -164,7 +176,7 @@ Voici la personnalité du dresseur :
 Choisis le Pokémon le plus compatible et renvoie uniquement son nom dans le JSON demandé.
 """
 
-    # Appel API
+    # on appel l'API
     completion = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[
@@ -174,7 +186,7 @@ Choisis le Pokémon le plus compatible et renvoie uniquement son nom dans le JSO
         response_format={"type": "json_object"}
     )
 
-    # Conversion JSON en dict
+    # on convertit le JSON en dict
     resultat_json = json.loads(completion.choices[0].message.content)
     nom_choisi = resultat_json["choix"]
 
@@ -184,56 +196,55 @@ Choisis le Pokémon le plus compatible et renvoie uniquement son nom dans le JSO
 # ------------------------------------------------------
 # Bouton : lancer la recommandation
 # ------------------------------------------------------
-if st.session_state["pokemons"] is not None and api_key:
-    if st.button("Trouver mon Pokémon compagnon"):
-        if not description_user.strip():
-            st.warning("Tu dois décrire ta personnalité avant.")
-        else:
-            with st.spinner("Analyse des compatibilités..."):
-                nom_compagnon = trouver_compagnon(
-                    api_key,
-                    st.session_state["pokemons"],
-                    description_user
-                )
+if st.session_state["pokemons"] is not None and description_user:
+    if st.button("🔍 Trouver mon Pokémon compagnon"):
+        with st.spinner("Analyse de compatibilité en cours..."):
+            nom_compagnon = trouver_compagnon(api_key, st.session_state["pokemons"], description_user)
+            st.session_state["nom_compagnon"] = nom_compagnon
+        st.success(f"Ton compagnon idéal est : **{nom_compagnon}** !")
 
-                st.success(f"Ton compagnon idéal est : **{nom_compagnon}** !")
-
-                # On filtre dans le DataFrame pour afficher les détails
-                poke = st.session_state["pokemons"]
-                selection = poke[poke["Nom"] == nom_compagnon]
-
-                if not selection.empty:
-                    st.write("### ⭐ Pokémon choisi")
-                    st.write(f"**Nom :** {selection.iloc[0]['Nom']}")
-                    st.write(f"**Description :** {selection.iloc[0]['Description']}")
-                else:
-                    st.error("Erreur : Pokémon non trouvé dans la liste.")
-
-#------------------------------------------------------
+# ------------------------------------------------------
 # Affichage de la carte d'identité en JSON
-#------------------------------------------------------
+# ------------------------------------------------------
 st.subheader("📄 Carte d'identité du champion")
 
-# On vérifier qu'un compagnon a été choisi
-if 'pokemons' in st.session_state and api_key:
-    if 'nom_compagnon' in locals() or 'nom_compagnon' in st.session_state:
-        # Pour la sécurité, on récupère le nom depuis st.session_state si nécessaire
-        nom_compagnon = nom_compagnon if 'nom_compagnon' in locals() else st.session_state['nom_compagnon']
+pokemons = st.session_state.get("pokemons")
+nom_compagnon = st.session_state.get("nom_compagnon")
 
-        # On filtrer le DataFrame pour récupérer la ligne correspondant au Pokémon choisi
-        poke = st.session_state["pokemons"]
-        selection = poke[poke["Nom"] == nom_compagnon]
+if pokemons is not None and isinstance(pokemons, pd.DataFrame) and not pokemons.empty:
+    
+    # on cherche dynamiquement la colonne correspondant au nom
+    name_col = next((c for c in pokemons.columns if "nom" in c), None)
+    
+    if name_col is None:
+        st.error("Impossible de trouver la colonne contenant le nom des Pokémon.")
+        st.write("Colonnes trouvées :", pokemons.columns.tolist())
+    elif not nom_compagnon:
+        st.info("Cliquez d'abord sur 'Trouver mon Pokémon compagnon' pour générer la carte d'identité.")
+    else:
+        # on normalise le nom du compagnon pour la recherche
+        nom_compagnon_lower = nom_compagnon.lower()
+        
+        # on filtrer le Pokémon choisi
+        selection = pokemons[pokemons[name_col].str.lower() == nom_compagnon_lower]
 
         if not selection.empty:
-            # Convertir la ligne en JSON brut
+            st.write("### ⭐ Pokémon choisi")
+            
+            # on affiche toutes les informations disponibles
+            for col in pokemons.columns:
+                valeur = selection.iloc[0][col]
+                col_affichage = col.capitalize()
+                st.write(f"**{col_affichage} :** {valeur}")
+
+            # Carte d'identité JSON
             data_json = selection.iloc[0].to_dict()
             json_brut = json.dumps(data_json, ensure_ascii=False, indent=4)
-
-            st.markdown("**Copiez ce code JSON, il est la carte d'identité de votre champion :**")
+            st.markdown("---")
+            st.markdown("**📋 Copiez ce code JSON, il est la carte d'identité de votre champion :**")
             st.code(json_brut, language="json")
         else:
-            st.warning("Le Pokémon choisi n'a pas été trouvé.")
-    else:
-        st.info("Cliquez d'abord sur 'Trouver mon Pokémon compagnon' pour générer la carte d'identité.")
+            st.warning(f"Le Pokémon '{nom_compagnon}' n'a pas été trouvé dans la liste.")
+            st.write("Pokémon disponibles :", pokemons[name_col].tolist())
 else:
     st.info("Aucun Pokémon généré pour le moment.")
