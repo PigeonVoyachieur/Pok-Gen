@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from groq import Groq
+import json
 
 logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Pok%C3%A9_Ball_icon.svg/2052px-Pok%C3%A9_Ball_icon.svg.png"
 
@@ -138,7 +139,7 @@ description_user = st.text_area(
 def trouver_compagnon(api_key, dataframe, description_user):
     client = Groq(api_key=api_key)
 
-    # on converti le DataFrame en texte
+    # Convertir le DataFrame en texte
     liste_texte = dataframe.to_json(orient="records", force_ascii=False)
 
     system_prompt = """
@@ -163,7 +164,7 @@ Voici la personnalité du dresseur :
 Choisis le Pokémon le plus compatible et renvoie uniquement son nom dans le JSON demandé.
 """
 
-    # On appel l'API
+    # Appel API
     completion = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[
@@ -173,9 +174,38 @@ Choisis le Pokémon le plus compatible et renvoie uniquement son nom dans le JSO
         response_format={"type": "json_object"}
     )
 
-    # On récupère le JSON
-    resultat = pd.read_json(completion.choices[0].message.content)
-    nom_choisi = resultat["choix"][0]
+    # Conversion JSON en dict
+    resultat_json = json.loads(completion.choices[0].message.content)
+    nom_choisi = resultat_json["choix"]
 
     return nom_choisi
+
+
+# ------------------------------------------------------
+# Bouton : lancer la recommandation
+# ------------------------------------------------------
+if st.session_state["pokemons"] is not None and api_key:
+    if st.button("Trouver mon Pokémon compagnon"):
+        if not description_user.strip():
+            st.warning("Tu dois décrire ta personnalité avant.")
+        else:
+            with st.spinner("Analyse des compatibilités..."):
+                nom_compagnon = trouver_compagnon(
+                    api_key,
+                    st.session_state["pokemons"],
+                    description_user
+                )
+
+                st.success(f"Ton compagnon idéal est : **{nom_compagnon}** !")
+
+                # On filtre dans le DataFrame pour afficher les détails
+                poke = st.session_state["pokemons"]
+                selection = poke[poke["Nom"] == nom_compagnon]
+
+                if not selection.empty:
+                    st.write("### ⭐ Pokémon choisi")
+                    st.write(f"**Nom :** {selection.iloc[0]['Nom']}")
+                    st.write(f"**Description :** {selection.iloc[0]['Description']}")
+                else:
+                    st.error("Erreur : Pokémon non trouvé dans la liste.")
 
