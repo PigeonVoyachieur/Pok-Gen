@@ -18,8 +18,6 @@ st.set_page_config(
 
 champion_img = load_image_base64("ChampionSprite.png")
 adversaire_img = load_image_base64("AdversaireSprite.png")
-battle_gif = load_image_base64("Battle.gif")
-
 
 
 st.title("🏟️ Arène Pokémon")
